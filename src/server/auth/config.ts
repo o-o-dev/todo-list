@@ -1,4 +1,7 @@
 import { type DefaultSession, type NextAuthConfig } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+
+import { api } from "todo/trpc/server";
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -23,6 +26,13 @@ declare module "next-auth" {
  */
 export const authConfig = {
   providers: [
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        username: { label: "Username", type: "text", placeholder: "Username" },
+        password: { label: "Password", type: "text", placeholder: "Password" },
+      },
+    }),
     /**
      * ...add more providers here.
      *
