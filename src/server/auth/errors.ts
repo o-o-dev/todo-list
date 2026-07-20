@@ -11,3 +11,11 @@ export class UserNotFoundError extends CredentialsSignin {
 export class ValidationError extends CredentialsSignin {
   error = "validation_error";
 }
+
+export class UserNameTakeError extends CredentialsSignin {
+  error = "user_name_taken";
+}
+
+export class DatabaseError extends CredentialsSignin {
+  error = "database_error";
+}

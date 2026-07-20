@@ -12,7 +12,7 @@ export const todoRouter = createTRPCRouter({
       status: "up and running",
     };
   }),
-  getAll: publicProcedure.query(({ ctx }) => {
-    return ctx.db.query.todos.findMany();
+  getAll: publicProcedure.query(async ({ ctx }) => {
+    return await ctx.db.query.todos.findMany();
   }),
 });
