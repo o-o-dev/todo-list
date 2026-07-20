@@ -1,7 +1,34 @@
-import { type DefaultSession, type NextAuthConfig } from "next-auth";
+import {
+  type DefaultSession,
+  type NextAuthConfig,
+  CredentialsSignin,
+} from "next-auth";
+import { type JWT } from "next-auth/jwt";
 import CredentialsProvider from "next-auth/providers/credentials";
 
-import { api } from "todo/trpc/server";
+import { db } from "todo/server/db";
+import { users } from "todo/server/db/schema";
+import { eq } from "drizzle-orm";
+
+import { z } from "zod";
+import bcrypt from "bcryptjs";
+
+class InvalidCredentialsError extends CredentialsSignin {
+  error = "invalid_credentials";
+}
+
+class UserNotFoundError extends CredentialsSignin {
+  error = "user_not_found";
+}
+
+class ValidationError extends CredentialsSignin {
+  error = "validation_error";
+}
+
+const credentialsSchema = z.object({
+  username: z.string().min(5),
+  password: z.string().min(9),
+});
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -10,12 +37,21 @@ import { api } from "todo/trpc/server";
  * @see https://next-auth.js.org/getting-started/typescript#module-augmentation
  */
 declare module "next-auth" {
+  interface User {
+    username: string;
+  }
   interface Session extends DefaultSession {
     user: {
       id: string;
-      // ...other properties
-      // role: UserRole;
+      username: string;
     } & DefaultSession["user"];
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    id?: string;
+    username: string;
   }
 }
 
@@ -29,10 +65,56 @@ export const authConfig = {
     CredentialsProvider({
       name: "Credentials",
       credentials: {
-        username: { label: "Username", type: "text", placeholder: "Username" },
-        password: { label: "Password", type: "text", placeholder: "Password" },
+        username: {
+          label: "Username",
+          type: "username",
+          placeholder: "Username",
+        },
+        password: {
+          label: "Password",
+          type: "password",
+          placeholder: "Password",
+        },
+      },
+      async authorize(credentials, req) {
+        try {
+          const parsedCreds = credentialsSchema.safeParse(credentials);
+          if (!parsedCreds.success) {
+            throw new ValidationError();
+          }
+
+          const [user] = await db
+            .select()
+            .from(users)
+            .where(eq(users.username, parsedCreds.data.username))
+            .limit(1);
+
+          if (!user) {
+            throw new UserNotFoundError();
+          }
+
+          const passwordMatch = await bcrypt.compare(
+            parsedCreds.data.password,
+            user.password,
+          );
+
+          if (!passwordMatch) {
+            throw new InvalidCredentialsError();
+          }
+
+          return {
+            id: user.id,
+            username: user.username,
+          };
+        } catch (error) {
+          if (error instanceof CredentialsSignin) {
+            throw error;
+          }
+          throw new Error("Something went Wrong");
+        }
       },
     }),
+
     /**
      * ...add more providers here.
      *
@@ -44,12 +126,24 @@ export const authConfig = {
      */
   ],
   callbacks: {
-    session: ({ session, user }) => ({
+    session: ({ session, token }) => ({
       ...session,
       user: {
         ...session.user,
-        id: user.id,
+        id: token.id,
+        username: token.username,
       },
     }),
+    async signIn({ user, account, profile, email, credentials }) {
+      // extra checks after sign in go here
+      return true;
+    },
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.username = user.username;
+      }
+      return token;
+    },
   },
 } satisfies NextAuthConfig;
