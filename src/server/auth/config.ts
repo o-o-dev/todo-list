@@ -13,17 +13,11 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 
-class InvalidCredentialsError extends CredentialsSignin {
-  error = "invalid_credentials";
-}
-
-class UserNotFoundError extends CredentialsSignin {
-  error = "user_not_found";
-}
-
-class ValidationError extends CredentialsSignin {
-  error = "validation_error";
-}
+import {
+  ValidationError,
+  UserNotFoundError,
+  InvalidCredentialsError,
+} from "./errors";
 
 const credentialsSchema = z.object({
   username: z.string().min(5),
