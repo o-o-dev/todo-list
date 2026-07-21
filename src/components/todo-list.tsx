@@ -107,7 +107,7 @@ export function TodoList() {
         .filter(([, state]) => state.content !== undefined)
         .map(([id, state]) => ({
           id,
-          content: state.content as string,
+          content: state.content!,
         })),
       deleteIds: Array.from(batchState.pendingDeletes),
     });
@@ -123,18 +123,26 @@ export function TodoList() {
 
   return (
     <div className="space-y-4">
-      {/* Task count */}
-      <div className="flex flex-row justify-between">
-        <span className="text-muted-foreground text-sm">
-          {todos.length} {todos.length === 1 ? "task" : "tasks"}
-        </span>
+      {/* Task count and mode toggle */}
+      <div className="flex flex-row items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground text-sm">
+            {todos.length} {todos.length === 1 ? "task" : "tasks"}
+          </span>
+          {isBatchMode && (
+            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+              Batch Mode
+            </span>
+          )}
+        </div>
         <div>
           <Button
             onClick={() => setBatchMode((prev) => !prev)}
             size="default"
             aria-pressed={isBatchMode}
+            variant={isBatchMode ? "default" : "outline"}
           >
-            {isBatchMode ? "Single Mode" : "Batch Mode"}
+            {isBatchMode ? "Exit Batch Mode" : "Batch Mode"}
           </Button>
         </div>
       </div>
@@ -142,86 +150,42 @@ export function TodoList() {
       {/* Todo list */}
       {todos.length > 0 ? (
         <ul className="space-y-3">
-          {todos.map((todo) => (
-            <li
-              key={todo.id}
-              className="border-border/50 bg-background/50 flex items-center gap-3 rounded-xl border p-4 transition-colors"
-            >
-              <button
-                onClick={() => toggleTodo.mutate({ id: todo.id })}
-                type="button"
-                className={`size-5 rounded-full border-2 transition-colors ${
-                  todo.isCompleted
-                    ? "border-primary bg-primary"
-                    : "border-border hover:border-primary/50"
-                }`}
-                aria-label={
-                  todo.isCompleted
-                    ? "Mark task as incomplete"
-                    : "Mark task as complete"
-                }
-              >
-                {todo.isCompleted && (
-                  <svg
-                    className="text-primary-foreground size-full p-0.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={3}
-                    aria-hidden="true"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                )}
-              </button>
+          {todos.map((todo) => {
+            const isPendingDelete = batchState.pendingDeletes.has(todo.id);
+            const isPendingUpdate = Boolean(batchState.pendingUpdates[todo.id]);
 
-              {editingId === todo.id ? (
-                /* Edit mode */
-                <div className="flex flex-1 items-center gap-2">
-                  <Input
-                    type="text"
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        isBatchMode
-                          ? updateLocal(todo.id, editContent)
-                          : saveEdit(todo.id);
-                      }
-                      if (e.key === "Escape") cancelEditing();
-                    }}
-                    className="h-8 flex-1 text-sm"
-                    maxLength={256}
-                    autoFocus
-                    disabled={
-                      isBatchMode ? batchTodo.isPending : updateTodo.isPending
-                    }
-                    aria-label="Edit task content"
-                  />
-                  {/* Save button */}
-                  <button
-                    onClick={() =>
-                      isBatchMode
-                        ? updateLocal(todo.id, editContent)
-                        : saveEdit(todo.id)
-                    }
-                    type="button"
-                    className="text-muted-foreground transition-colors hover:text-green-500"
-                    aria-label="Save edit"
-                    disabled={
-                      isBatchMode ? batchTodo.isPending : updateTodo.isPending
-                    }
-                  >
+            return (
+              <li
+                key={todo.id}
+                className={`flex items-center gap-3 rounded-xl border p-4 transition-all ${
+                  isPendingDelete
+                    ? "border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/50"
+                    : isPendingUpdate
+                      ? "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/50"
+                      : "border-border/50 bg-background/50"
+                }`}
+              >
+                <button
+                  onClick={() => toggleTodo.mutate({ id: todo.id })}
+                  type="button"
+                  className={`size-5 rounded-full border-2 transition-colors ${
+                    todo.isCompleted
+                      ? "border-primary bg-primary"
+                      : "border-border hover:border-primary/50"
+                  }`}
+                  aria-label={
+                    todo.isCompleted
+                      ? "Mark task as incomplete"
+                      : "Mark task as complete"
+                  }
+                >
+                  {todo.isCompleted && (
                     <svg
-                      className="size-4"
+                      className="text-primary-foreground size-full p-0.5"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
-                      strokeWidth={2}
+                      strokeWidth={3}
                       aria-hidden="true"
                     >
                       <path
@@ -230,100 +194,186 @@ export function TodoList() {
                         d="M5 13l4 4L19 7"
                       />
                     </svg>
-                  </button>
-                  {/* Cancel button */}
-                  <button
-                    onClick={cancelEditing}
-                    type="button"
-                    className="text-muted-foreground hover:text-destructive transition-colors"
-                    aria-label="Cancel edit"
-                    disabled={
-                      isBatchMode ? batchTodo.isPending : updateTodo.isPending
-                    }
-                  >
-                    <svg
-                      className="size-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              ) : (
-                /* View mode */
-                <>
-                  <span
-                    className={`text-foreground flex-1 text-sm ${
-                      todo.isCompleted
-                        ? "text-muted-foreground line-through"
-                        : ""
-                    }`}
-                  >
-                    {batchState.pendingUpdates[todo.id]?.content ??
-                      todo.content}
-                  </span>
+                  )}
+                </button>
 
-                  {/* Edit button */}
-                  <button
-                    onClick={() => startEditing(todo.id, todo.content)}
-                    type="button"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label="Edit task"
-                  >
-                    <svg
-                      className="size-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      aria-hidden="true"
+                {editingId === todo.id ? (
+                  /* Edit mode */
+                  <div className="flex flex-1 items-center gap-2">
+                    <Input
+                      type="text"
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          if (isBatchMode) {
+                            updateLocal(todo.id, editContent);
+                          } else {
+                            saveEdit(todo.id);
+                          }
+                        }
+                        if (e.key === "Escape") cancelEditing();
+                      }}
+                      className="h-8 flex-1 text-sm"
+                      maxLength={256}
+                      autoFocus
+                      disabled={
+                        isBatchMode ? batchTodo.isPending : updateTodo.isPending
+                      }
+                      aria-label="Edit task content"
+                    />
+                    {/* Save button */}
+                    <button
+                      onClick={() =>
+                        isBatchMode
+                          ? updateLocal(todo.id, editContent)
+                          : saveEdit(todo.id)
+                      }
+                      type="button"
+                      className="text-muted-foreground transition-colors hover:text-green-500"
+                      aria-label="Save edit"
+                      disabled={
+                        isBatchMode ? batchTodo.isPending : updateTodo.isPending
+                      }
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
-                      />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() =>
-                      isBatchMode
-                        ? markForDelete(todo.id)
-                        : deleteTodo.mutate({ id: todo.id })
-                    }
-                    type="button"
-                    className="text-muted-foreground hover:text-destructive transition-colors"
-                    aria-label={
-                      isBatchMode ? "Mark task for deletion" : "Delete task"
-                    }
-                  >
-                    <svg
-                      className="size-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      aria-hidden="true"
+                      <svg
+                        className="size-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    </button>
+                    {/* Cancel button */}
+                    <button
+                      onClick={cancelEditing}
+                      type="button"
+                      className="text-muted-foreground hover:text-destructive transition-colors"
+                      aria-label="Cancel edit"
+                      disabled={
+                        isBatchMode ? batchTodo.isPending : updateTodo.isPending
+                      }
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                </>
-              )}
-            </li>
-          ))}
+                      <svg
+                        className="size-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  /* View mode */
+                  <>
+                    <div className="flex flex-1 items-center gap-2">
+                      <span
+                        className={`flex-1 text-sm ${
+                          isPendingDelete
+                            ? "text-red-500 line-through dark:text-red-400"
+                            : todo.isCompleted
+                              ? "text-muted-foreground line-through"
+                              : "text-foreground"
+                        }`}
+                      >
+                        {batchState.pendingUpdates[todo.id]?.content ??
+                          todo.content}
+                      </span>
+
+                      {/* Pending update badge */}
+                      {isPendingUpdate && !isPendingDelete && (
+                        <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-800 dark:text-amber-200">
+                          Edited
+                        </span>
+                      )}
+
+                      {/* Pending delete badge with undo */}
+                      {isPendingDelete && (
+                        <button
+                          onClick={() => unmarkForDelete(todo.id)}
+                          type="button"
+                          className="rounded-full bg-red-200 px-2 py-0.5 text-xs font-medium text-red-800 transition-colors hover:bg-red-300 dark:bg-red-800 dark:text-red-200 dark:hover:bg-red-700"
+                          aria-label="Undo delete"
+                        >
+                          Undo
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Edit button - hidden if pending delete */}
+                    {!isPendingDelete && (
+                      <button
+                        onClick={() => startEditing(todo.id, todo.content)}
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label="Edit task"
+                      >
+                        <svg
+                          className="size-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
+                          />
+                        </svg>
+                      </button>
+                    )}
+
+                    {/* Delete button - hidden if already pending delete */}
+                    {!isPendingDelete && (
+                      <button
+                        onClick={() =>
+                          isBatchMode
+                            ? markForDelete(todo.id)
+                            : deleteTodo.mutate({ id: todo.id })
+                        }
+                        type="button"
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                        aria-label={
+                          isBatchMode ? "Mark task for deletion" : "Delete task"
+                        }
+                      >
+                        <svg
+                          className="size-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                  </>
+                )}
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <div className="text-muted-foreground py-8 text-center text-sm">
