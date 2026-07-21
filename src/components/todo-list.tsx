@@ -3,8 +3,20 @@
 import { api } from "todo/trpc/react";
 
 export function TodoList() {
+  const utils = api.useUtils();
   const { data, isLoading } = api.todo.getAll.useQuery();
   const todos = data ?? [];
+
+  const toggleTodo = api.todo.toggle.useMutation({
+    onSuccess: () => {
+      utils.todo.getAll.invalidate();
+    },
+  });
+  const deleteTodo = api.todo.delete.useMutation({
+    onSuccess: () => {
+      utils.todo.getAll.invalidate();
+    },
+  });
 
   if (isLoading) {
     return (
@@ -32,7 +44,7 @@ export function TodoList() {
               className="border-border/50 bg-background/50 flex items-center gap-3 rounded-xl border p-4 transition-colors"
             >
               <button
-                onClick={() => {}}
+                onClick={() => toggleTodo.mutate({ id: todo.id })}
                 type="button"
                 className={`size-5 rounded-full border-2 transition-colors ${
                   todo.isCompleted
@@ -71,6 +83,7 @@ export function TodoList() {
               </span>
 
               <button
+                onClick={() => deleteTodo.mutate({ id: todo.id })}
                 type="button"
                 className="text-muted-foreground hover:text-destructive transition-colors"
                 aria-label="Delete task"
