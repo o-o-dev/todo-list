@@ -56,6 +56,21 @@ export default function LoginPage() {
     setIsLoading(true);
     setErrors({});
 
+    const result = await signIn("credentials", {
+      username,
+      password,
+      redirect: false,
+    });
+
+    if (!result?.error) {
+      router.push("/");
+    } else {
+      const errorMessages: Record<string, string> = {
+        CredentialsSignin: "Invalid Username or Password",
+      };
+      const message = errorMessages[result?.error ?? ""] || "Login Failed";
+      setErrors({ form: message });
+    }
     setIsLoading(false);
   };
 
@@ -63,8 +78,8 @@ export default function LoginPage() {
     <div className="bg-background relative flex min-h-screen items-center justify-center overflow-hidden p-4">
       {/* Background Pattern */}
       <div className="absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#8882_1px,transparent_1px),linear-gradient(to_bottom,#8882_1px,transparent_1px)] bg-[size:64px_64px]" />
-        <div className="from-primary/5 absolute top-0 left-1/2 h-[500px] w-[800px] -translate-x-1/2 rounded-full bg-gradient-to-b to-transparent blur-3xl" />
+        <div className="bg-size-64px_64px] absolute inset-0 bg-[linear-gradient(to_right,#8882_1px,transparent_1px),linear-gradient(to_bottom,#8882_1px,transparent_1px)]" />
+        <div className="from-primary/5 absolute top-0 left-1/2 h-125 w-200 -translate-x-1/2 rounded-full bg-linear-to-b to-transparent blur-3xl" />
       </div>
 
       {/* Decorative Elements */}
@@ -197,7 +212,7 @@ export default function LoginPage() {
       </Card>
 
       {/* Bottom decorative line */}
-      <div className="via-border absolute right-0 bottom-0 left-0 h-px bg-gradient-to-r from-transparent to-transparent" />
+      <div className="via-border absolute right-0 bottom-0 left-0 h-px bg-linear-to-r from-transparent to-transparent" />
     </div>
   );
 }
