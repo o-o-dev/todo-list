@@ -68,7 +68,7 @@ export default function LoginPage() {
       const errorMessages: Record<string, string> = {
         CredentialsSignin: "Invalid Username or Password",
       };
-      const message = errorMessages[result?.error ?? ""] || "Login Failed";
+      const message = errorMessages[result?.error ?? ""] ?? "Login Failed";
       setErrors({ form: message });
     }
     setIsLoading(false);
