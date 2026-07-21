@@ -7,7 +7,7 @@ export default function AuthLayout({
     <div className="bg-background relative flex min-h-screen items-center justify-center overflow-hidden p-4">
       {/* Background Pattern */}
       <div className="absolute inset-0 -z-10">
-        <div className="bg-size-64px_64px] absolute inset-0 bg-[linear-gradient(to_right,#8882_1px,transparent_1px),linear-gradient(to_bottom,#8882_1px,transparent_1px)]" />
+        <div className="bg-size-16_16] absolute inset-0 bg-[linear-gradient(to_right,#8882_1px,transparent_1px),linear-gradient(to_bottom,#8882_1px,transparent_1px)]" />
         <div className="from-primary/5 absolute top-0 left-1/2 h-125 w-200 -translate-x-1/2 rounded-full bg-linear-to-b to-transparent blur-3xl" />
       </div>
 
