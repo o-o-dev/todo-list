@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "todo/server/api/trpc";
 import { todos } from "todo/server/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export const todoRouter = createTRPCRouter({
   getAll: protectedProcedure.query(async ({ ctx }) => {
@@ -17,7 +17,9 @@ export const todoRouter = createTRPCRouter({
       const [todo] = await ctx.db
         .select()
         .from(todos)
-        .where(eq(todos.id, input.id))
+        .where(
+          and(eq(todos.id, input.id), eq(todos.userId, ctx.session.user.id)),
+        )
         .limit(1);
       const newVal = !todo?.isCompleted;
 
@@ -31,7 +33,11 @@ export const todoRouter = createTRPCRouter({
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.db.delete(todos).where(eq(todos.id, input.id));
+      await ctx.db
+        .delete(todos)
+        .where(
+          and(eq(todos.id, input.id), eq(todos.userId, ctx.session.user.id)),
+        );
       return { id: input.id };
     }),
   create: protectedProcedure
@@ -51,5 +57,26 @@ export const todoRouter = createTRPCRouter({
         .returning();
 
       return todo;
+    }),
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        content: z
+          .string()
+          .trim()
+          .min(1, "Content Required")
+          .max(256, "Todo is too long"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .update(todos)
+        .set({ content: input.content })
+        .where(
+          and(eq(todos.id, input.id), eq(todos.userId, ctx.session.user.id)),
+        );
+
+      return { id: input.id };
     }),
 });
