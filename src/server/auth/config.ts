@@ -45,6 +45,10 @@ declare module "next-auth/jwt" {
  * @see https://next-auth.js.org/configuration/options
  */
 export const authConfig = {
+  session: {
+    strategy: "jwt",
+    maxAge: 14 * 24 * 60 * 60,
+  },
   providers: [
     CredentialsProvider({
       name: "Credentials",
