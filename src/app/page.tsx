@@ -1,5 +1,5 @@
 import { auth } from "todo/server/auth";
-import { api, HydrateClient } from "todo/trpc/server";
+import { HydrateClient } from "todo/trpc/server";
 import {
   Card,
   CardContent,
@@ -11,11 +11,10 @@ import { Button, buttonVariants } from "todo/components/ui/button";
 import { signOut } from "todo/server/auth";
 
 import Link from "next/link";
+import { TodoList } from "todo/components/todo-list";
 
 export default async function Home() {
   const session = await auth();
-
-  const todos = await api.todo.getAll();
 
   return (
     <HydrateClient>
@@ -91,35 +90,11 @@ export default async function Home() {
                     <CardTitle className="text-lg font-medium">
                       Your Tasks
                     </CardTitle>
-                    <span className="text-muted-foreground text-sm">
-                      {todos.length} {todos.length === 1 ? "task" : "tasks"}
-                    </span>
                   </div>
                 </CardHeader>
 
                 <CardContent>
-                  {todos.length > 0 ? (
-                    <ul className="space-y-3">
-                      {todos.map((todo) => (
-                        <li
-                          key={todo.id}
-                          className="border-border/50 bg-background/50 flex items-center gap-3 rounded-xl border p-4 transition-colors"
-                        >
-                          <div className="border-border size-5 rounded-full border-2" />
-                          <span className="text-foreground text-sm">
-                            {todo.content}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="text-muted-foreground py-8 text-center text-sm">
-                      <p>No tasks yet</p>
-                      <p className="mt-1 text-xs">
-                        Add your first task to get started
-                      </p>
-                    </div>
-                  )}
+                  <TodoList />
                 </CardContent>
               </Card>
             )}
