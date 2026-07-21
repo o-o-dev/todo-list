@@ -6,6 +6,16 @@ import { Input } from "todo/components/ui/input";
 
 import { type BatchState } from "./interfaces";
 import { Button } from "./ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 export function TodoList() {
   const utils = api.useUtils();
@@ -13,6 +23,7 @@ export function TodoList() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [isBatchMode, setBatchMode] = useState(false);
+  const [showExitWarning, setShowExitWarning] = useState(false);
   const [batchState, setBatchState] = useState<BatchState>({
     pendingUpdates: {},
     pendingDeletes: new Set(),
@@ -93,6 +104,20 @@ export function TodoList() {
     setBatchState({ pendingUpdates: {}, pendingDeletes: new Set() });
   };
 
+  const handleModeToggle = () => {
+    if (isBatchMode && hasPendingChanges) {
+      setShowExitWarning(true);
+      return;
+    }
+    setBatchMode((prev) => !prev);
+  };
+
+  const handleDiscardAndExit = () => {
+    discardChanges();
+    setBatchMode(false);
+    setShowExitWarning(false);
+  };
+
   const saveEdit = (id: string) => {
     const trimmed = editContent.trim();
     if (!trimmed) return;
@@ -137,7 +162,7 @@ export function TodoList() {
         </div>
         <div>
           <Button
-            onClick={() => setBatchMode((prev) => !prev)}
+            onClick={handleModeToggle}
             size="default"
             aria-pressed={isBatchMode}
             variant={isBatchMode ? "default" : "outline"}
@@ -409,6 +434,33 @@ export function TodoList() {
           </div>
         </div>
       )}
+
+      {/* Exit batch mode warning dialog */}
+      <AlertDialog open={showExitWarning} onOpenChange={setShowExitWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have{" "}
+              {pendingUpdatesCount > 0 &&
+                `${pendingUpdatesCount} edit${pendingUpdatesCount !== 1 ? "s" : ""}`}
+              {pendingUpdatesCount > 0 && pendingDeletesCount > 0 && " and "}
+              {pendingDeletesCount > 0 &&
+                `${pendingDeletesCount} delete${pendingDeletesCount !== 1 ? "s" : ""}`}{" "}
+              pending. Exiting batch mode will discard all unsaved changes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDiscardAndExit}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Discard & Exit
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
