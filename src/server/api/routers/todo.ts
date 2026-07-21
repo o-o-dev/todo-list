@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "todo/server/api/trpc";
 import { todos } from "todo/server/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 import { trpcErrors } from "todo/server/auth/errors";
 
@@ -33,7 +33,9 @@ export const todoRouter = createTRPCRouter({
       await ctx.db
         .update(todos)
         .set({ isCompleted: newVal })
-        .where(eq(todos.id, input.id));
+        .where(
+          and(eq(todos.id, input.id), eq(todos.userId, ctx.session.user.id)),
+        );
 
       return { id: input.id, isCompleted: newVal };
     }),
@@ -96,5 +98,58 @@ export const todoRouter = createTRPCRouter({
         throw trpcErrors.notFound("Todo not Found");
       }
       return { id: input.id };
+    }),
+  batch: protectedProcedure
+    .input(
+      z.object({
+        updates: z.array(
+          z.object({
+            id: z.string(),
+            content: z
+              .string()
+              .trim()
+              .min(1, "Must add Content")
+              .max(256, "Todo too long"),
+          }),
+        ),
+        deleteIds: z.array(z.string()),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      if (input.updates.length === 0 && input.deleteIds.length === 0) {
+        return { success: true, updateCount: 0, deleteCount: 0 };
+      }
+      let updateCount = 0;
+      let deleteCount = 0;
+      try {
+        await ctx.db.transaction(async (tx) => {
+          for (const update of input.updates) {
+            const result = await tx
+              .update(todos)
+              .set({ content: update.content })
+              .where(and(eq(todos.id, update.id), eq(todos.userId, userId)))
+              .returning({ id: todos.id });
+            updateCount += result.length;
+          }
+
+          if (input.deleteIds.length > 0) {
+            const result = await tx
+              .delete(todos)
+              .where(
+                and(
+                  inArray(todos.id, input.deleteIds),
+                  eq(todos.userId, userId),
+                ),
+              )
+              .returning({ id: todos.id });
+            deleteCount = result.length;
+          }
+        });
+      } catch (error) {
+        throw trpcErrors.internalError("Batch operation Failed");
+      }
+
+      return { success: true, updateCount, deleteCount };
     }),
 });

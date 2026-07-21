@@ -26,4 +26,10 @@ export const trpcErrors = {
       message: message,
     });
   },
+  authenticationError: () => {
+    return new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Not Authorized",
+    });
+  },
 };
