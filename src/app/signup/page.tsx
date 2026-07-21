@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "todo/components/ui/button";
@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "todo/components/ui/card";
+import { api } from "todo/trpc/react";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -30,6 +31,18 @@ export default function SignupPage() {
     confirmPassword?: string;
     form?: string;
   }>({});
+
+  const signup = api.signup.signup.useMutation({
+    onSuccess: () => {
+      router.push("/login");
+    },
+    onError: (error) => {
+      setErrors({ form: error.message });
+    },
+    onSettled: () => {
+      setIsLoading(false);
+    },
+  });
 
   // Validation
   const validateForm = (): boolean => {
@@ -62,19 +75,7 @@ export default function SignupPage() {
     setIsLoading(true);
     setErrors({});
 
-    try {
-      // TODO: Call tRPC signup mutation here
-      // Example: await api.signUp.signup.mutate({ username, password });
-
-      // On success, redirect to login
-      router.push("/login");
-    } catch (error) {
-      // TODO: Handle tRPC error here
-      // Example: setErrors({ form: error.message });
-      setErrors({ form: "Something went wrong. Please try again." });
-    } finally {
-      setIsLoading(false);
-    }
+    await signup.mutateAsync({ username, password });
   };
 
   return (
