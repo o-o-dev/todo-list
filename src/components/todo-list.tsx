@@ -4,10 +4,20 @@ import { useState } from "react";
 import { api } from "todo/trpc/react";
 import { Input } from "todo/components/ui/input";
 
+import { type BatchState } from "./interfaces";
+import { Button } from "./ui/button";
+
 export function TodoList() {
   const utils = api.useUtils();
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [isBatchMode, setBatchMode] = useState(true);
+  const [batchState, setBatchState] = useState<BatchState>({
+    pendingUpdates: {},
+    pendingDeletes: new Set(),
+  });
+
   const { data, isLoading } = api.todo.getAll.useQuery();
   const todos = data ?? [];
 
@@ -30,6 +40,13 @@ export function TodoList() {
     },
   });
 
+  const batchTodo = api.todo.batch.useMutation({
+    onSuccess: () => {
+      setBatchState({ pendingUpdates: {}, pendingDeletes: new Set() });
+      void utils.todo.getAll.invalidate();
+    },
+  });
+
   const startEditing = (id: string, content: string) => {
     setEditingId(id);
     setEditContent(content);
@@ -40,10 +57,34 @@ export function TodoList() {
     setEditContent("");
   };
 
+  const updateLocal = (id: string, content: string) => {
+    setBatchState((prev) => ({
+      ...prev,
+      pendingUpdates: { ...prev.pendingUpdates, [id]: { content } },
+    }));
+  };
+
+  const markedForDelete = (id: string) => {
+    setBatchState((prev) => ({
+      ...prev,
+      pendingDeletes: new Set(prev.pendingDeletes).add(id),
+    }));
+  };
+
   const saveEdit = (id: string) => {
     const trimmed = editContent.trim();
     if (!trimmed) return;
     updateTodo.mutate({ id, content: trimmed });
+  };
+
+  const submitBatch = () => {
+    batchTodo.mutate({
+      updates: Object.entries(batchState.pendingUpdates).map(([id, state]) => ({
+        id,
+        content: state.content!,
+      })),
+      deleteIds: Array.from(batchState.pendingDeletes),
+    });
   };
 
   if (isLoading) {
@@ -57,10 +98,19 @@ export function TodoList() {
   return (
     <div className="space-y-4">
       {/* Task count */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-row justify-between">
         <span className="text-muted-foreground text-sm">
           {todos.length} {todos.length === 1 ? "task" : "tasks"}
         </span>
+        <div>
+          <Button
+            onClick={() => setBatchMode((prev) => !prev)}
+            className=""
+            size="default"
+          >
+            {isBatchMode ? "Single Mode" : "Batch Mode"}
+          </Button>
+        </div>
       </div>
 
       {/* Todo list */}
@@ -122,7 +172,7 @@ export function TodoList() {
                   <button
                     onClick={() => saveEdit(todo.id)}
                     type="button"
-                    className="text-muted-foreground hover:text-green-500 transition-colors"
+                    className="text-muted-foreground transition-colors hover:text-green-500"
                     aria-label="Save edit"
                     disabled={updateTodo.isPending}
                   >
@@ -168,7 +218,9 @@ export function TodoList() {
                 <>
                   <span
                     className={`text-foreground flex-1 text-sm ${
-                      todo.isCompleted ? "text-muted-foreground line-through" : ""
+                      todo.isCompleted
+                        ? "text-muted-foreground line-through"
+                        : ""
                     }`}
                   >
                     {todo.content}
@@ -195,7 +247,7 @@ export function TodoList() {
                       />
                     </svg>
                   </button>
-                <button
+                  <button
                     onClick={() => deleteTodo.mutate({ id: todo.id })}
                     type="button"
                     className="text-muted-foreground hover:text-destructive transition-colors"
