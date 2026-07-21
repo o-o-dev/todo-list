@@ -4,6 +4,8 @@ import { createTRPCRouter, protectedProcedure } from "todo/server/api/trpc";
 import { todos } from "todo/server/db/schema";
 import { eq, and } from "drizzle-orm";
 
+import { trpcErrors } from "todo/server/auth/errors";
+
 export const todoRouter = createTRPCRouter({
   getAll: protectedProcedure.query(async ({ ctx }) => {
     return await ctx.db
@@ -21,7 +23,12 @@ export const todoRouter = createTRPCRouter({
           and(eq(todos.id, input.id), eq(todos.userId, ctx.session.user.id)),
         )
         .limit(1);
-      const newVal = !todo?.isCompleted;
+
+      if (!todo) {
+        throw trpcErrors.notFound("Todo Not Found");
+      }
+
+      const newVal = !todo.isCompleted;
 
       await ctx.db
         .update(todos)
@@ -33,11 +40,15 @@ export const todoRouter = createTRPCRouter({
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.db
+      const result = await ctx.db
         .delete(todos)
         .where(
           and(eq(todos.id, input.id), eq(todos.userId, ctx.session.user.id)),
-        );
+        )
+        .returning({ id: todos.id });
+      if (result.length === 0) {
+        throw trpcErrors.notFound("Todo not found");
+      }
       return { id: input.id };
     }),
   create: protectedProcedure
@@ -56,6 +67,10 @@ export const todoRouter = createTRPCRouter({
         .values({ content: input.content, userId: ctx.session.user.id })
         .returning();
 
+      if (!todo) {
+        throw trpcErrors.internalError("Error Creating Todo");
+      }
+
       return todo;
     }),
   update: protectedProcedure
@@ -70,13 +85,16 @@ export const todoRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.db
+      const result = await ctx.db
         .update(todos)
         .set({ content: input.content })
         .where(
           and(eq(todos.id, input.id), eq(todos.userId, ctx.session.user.id)),
-        );
-
+        )
+        .returning({ id: todos.id });
+      if (result.length === 0) {
+        throw trpcErrors.notFound("Todo not Found");
+      }
       return { id: input.id };
     }),
 });
