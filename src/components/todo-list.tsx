@@ -12,11 +12,18 @@ export function TodoList() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
-  const [isBatchMode, setBatchMode] = useState(true);
+  const [isBatchMode, setBatchMode] = useState(false);
   const [batchState, setBatchState] = useState<BatchState>({
     pendingUpdates: {},
     pendingDeletes: new Set(),
   });
+
+  // Derived state
+  const hasPendingChanges =
+    Object.keys(batchState.pendingUpdates).length > 0 ||
+    batchState.pendingDeletes.size > 0;
+  const pendingUpdatesCount = Object.keys(batchState.pendingUpdates).length;
+  const pendingDeletesCount = batchState.pendingDeletes.size;
 
   const { data, isLoading } = api.todo.getAll.useQuery();
   const todos = data ?? [];
@@ -49,7 +56,9 @@ export function TodoList() {
 
   const startEditing = (id: string, content: string) => {
     setEditingId(id);
-    setEditContent(content);
+    // In batch mode, use pending content if it exists
+    const pendingContent = batchState.pendingUpdates[id]?.content;
+    setEditContent(pendingContent ?? content);
   };
 
   const cancelEditing = () => {
@@ -62,13 +71,26 @@ export function TodoList() {
       ...prev,
       pendingUpdates: { ...prev.pendingUpdates, [id]: { content } },
     }));
+    cancelEditing();
   };
 
-  const markedForDelete = (id: string) => {
+  const markForDelete = (id: string) => {
     setBatchState((prev) => ({
       ...prev,
       pendingDeletes: new Set(prev.pendingDeletes).add(id),
     }));
+  };
+
+  const unmarkForDelete = (id: string) => {
+    setBatchState((prev) => {
+      const newDeletes = new Set(prev.pendingDeletes);
+      newDeletes.delete(id);
+      return { ...prev, pendingDeletes: newDeletes };
+    });
+  };
+
+  const discardChanges = () => {
+    setBatchState({ pendingUpdates: {}, pendingDeletes: new Set() });
   };
 
   const saveEdit = (id: string) => {
@@ -78,11 +100,15 @@ export function TodoList() {
   };
 
   const submitBatch = () => {
+    if (!hasPendingChanges) return;
+
     batchTodo.mutate({
-      updates: Object.entries(batchState.pendingUpdates).map(([id, state]) => ({
-        id,
-        content: state.content!,
-      })),
+      updates: Object.entries(batchState.pendingUpdates)
+        .filter(([, state]) => state.content !== undefined)
+        .map(([id, state]) => ({
+          id,
+          content: state.content as string,
+        })),
       deleteIds: Array.from(batchState.pendingDeletes),
     });
   };
@@ -105,8 +131,8 @@ export function TodoList() {
         <div>
           <Button
             onClick={() => setBatchMode((prev) => !prev)}
-            className=""
             size="default"
+            aria-pressed={isBatchMode}
           >
             {isBatchMode ? "Single Mode" : "Batch Mode"}
           </Button>
@@ -142,6 +168,7 @@ export function TodoList() {
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                     strokeWidth={3}
+                    aria-hidden="true"
                   >
                     <path
                       strokeLinecap="round"
@@ -160,21 +187,34 @@ export function TodoList() {
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") saveEdit(todo.id);
+                      if (e.key === "Enter") {
+                        isBatchMode
+                          ? updateLocal(todo.id, editContent)
+                          : saveEdit(todo.id);
+                      }
                       if (e.key === "Escape") cancelEditing();
                     }}
                     className="h-8 flex-1 text-sm"
                     maxLength={256}
                     autoFocus
-                    disabled={updateTodo.isPending}
+                    disabled={
+                      isBatchMode ? batchTodo.isPending : updateTodo.isPending
+                    }
+                    aria-label="Edit task content"
                   />
                   {/* Save button */}
                   <button
-                    onClick={() => saveEdit(todo.id)}
+                    onClick={() =>
+                      isBatchMode
+                        ? updateLocal(todo.id, editContent)
+                        : saveEdit(todo.id)
+                    }
                     type="button"
                     className="text-muted-foreground transition-colors hover:text-green-500"
                     aria-label="Save edit"
-                    disabled={updateTodo.isPending}
+                    disabled={
+                      isBatchMode ? batchTodo.isPending : updateTodo.isPending
+                    }
                   >
                     <svg
                       className="size-4"
@@ -182,6 +222,7 @@ export function TodoList() {
                       viewBox="0 0 24 24"
                       stroke="currentColor"
                       strokeWidth={2}
+                      aria-hidden="true"
                     >
                       <path
                         strokeLinecap="round"
@@ -196,7 +237,9 @@ export function TodoList() {
                     type="button"
                     className="text-muted-foreground hover:text-destructive transition-colors"
                     aria-label="Cancel edit"
-                    disabled={updateTodo.isPending}
+                    disabled={
+                      isBatchMode ? batchTodo.isPending : updateTodo.isPending
+                    }
                   >
                     <svg
                       className="size-4"
@@ -204,6 +247,7 @@ export function TodoList() {
                       viewBox="0 0 24 24"
                       stroke="currentColor"
                       strokeWidth={2}
+                      aria-hidden="true"
                     >
                       <path
                         strokeLinecap="round"
@@ -223,7 +267,8 @@ export function TodoList() {
                         : ""
                     }`}
                   >
-                    {todo.content}
+                    {batchState.pendingUpdates[todo.id]?.content ??
+                      todo.content}
                   </span>
 
                   {/* Edit button */}
@@ -239,6 +284,7 @@ export function TodoList() {
                       viewBox="0 0 24 24"
                       stroke="currentColor"
                       strokeWidth={2}
+                      aria-hidden="true"
                     >
                       <path
                         strokeLinecap="round"
@@ -248,10 +294,16 @@ export function TodoList() {
                     </svg>
                   </button>
                   <button
-                    onClick={() => deleteTodo.mutate({ id: todo.id })}
+                    onClick={() =>
+                      isBatchMode
+                        ? markForDelete(todo.id)
+                        : deleteTodo.mutate({ id: todo.id })
+                    }
                     type="button"
                     className="text-muted-foreground hover:text-destructive transition-colors"
-                    aria-label="Delete task"
+                    aria-label={
+                      isBatchMode ? "Mark task for deletion" : "Delete task"
+                    }
                   >
                     <svg
                       className="size-4"
@@ -259,6 +311,7 @@ export function TodoList() {
                       viewBox="0 0 24 24"
                       stroke="currentColor"
                       strokeWidth={2}
+                      aria-hidden="true"
                     >
                       <path
                         strokeLinecap="round"
@@ -276,6 +329,34 @@ export function TodoList() {
         <div className="text-muted-foreground py-8 text-center text-sm">
           <p>No tasks yet</p>
           <p className="mt-1 text-xs">Add your first task to get started</p>
+        </div>
+      )}
+      {isBatchMode && hasPendingChanges && (
+        <div
+          className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="text-sm text-amber-800 dark:text-amber-200">
+            {pendingUpdatesCount > 0 &&
+              `${pendingUpdatesCount} edit${pendingUpdatesCount !== 1 ? "s" : ""}`}
+            {pendingUpdatesCount > 0 && pendingDeletesCount > 0 && ", "}
+            {pendingDeletesCount > 0 &&
+              `${pendingDeletesCount} delete${pendingDeletesCount !== 1 ? "s" : ""}`}
+            {" pending"}
+          </span>
+          <div className="flex gap-2">
+            <Button onClick={discardChanges} variant="outline" size="sm">
+              Discard
+            </Button>
+            <Button
+              onClick={submitBatch}
+              size="sm"
+              disabled={batchTodo.isPending}
+            >
+              {batchTodo.isPending ? "Submitting..." : "Submit Changes"}
+            </Button>
+          </div>
         </div>
       )}
     </div>
