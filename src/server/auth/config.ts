@@ -1,8 +1,4 @@
-import {
-  type DefaultSession,
-  type NextAuthConfig,
-  CredentialsSignin,
-} from "next-auth";
+import { type DefaultSession, type NextAuthConfig } from "next-auth";
 import { type JWT } from "next-auth/jwt";
 import CredentialsProvider from "next-auth/providers/credentials";
 
@@ -12,12 +8,6 @@ import { eq } from "drizzle-orm";
 
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-
-import {
-  ValidationError,
-  UserNotFoundError,
-  InvalidCredentialsError,
-} from "./errors";
 
 const credentialsSchema = z.object({
   username: z.string().min(5),
@@ -71,41 +61,34 @@ export const authConfig = {
         },
       },
       async authorize(credentials, req) {
-        try {
-          const parsedCreds = credentialsSchema.safeParse(credentials);
-          if (!parsedCreds.success) {
-            throw new ValidationError();
-          }
-
-          const [user] = await db
-            .select()
-            .from(users)
-            .where(eq(users.username, parsedCreds.data.username))
-            .limit(1);
-
-          if (!user) {
-            throw new UserNotFoundError();
-          }
-
-          const passwordMatch = await bcrypt.compare(
-            parsedCreds.data.password,
-            user.password,
-          );
-
-          if (!passwordMatch) {
-            throw new InvalidCredentialsError();
-          }
-
-          return {
-            id: user.id,
-            username: user.username,
-          };
-        } catch (error) {
-          if (error instanceof CredentialsSignin) {
-            throw error;
-          }
-          throw new Error("Something went Wrong");
+        const parsedCreds = credentialsSchema.safeParse(credentials);
+        if (!parsedCreds.success) {
+          return null;
         }
+
+        const [user] = await db
+          .select()
+          .from(users)
+          .where(eq(users.username, parsedCreds.data.username))
+          .limit(1);
+
+        if (!user) {
+          return null;
+        }
+
+        const passwordMatch = await bcrypt.compare(
+          parsedCreds.data.password,
+          user.password,
+        );
+
+        if (!passwordMatch) {
+          return null;
+        }
+
+        return {
+          id: user.id,
+          username: user.username,
+        };
       },
     }),
 
@@ -128,10 +111,6 @@ export const authConfig = {
         username: token.username,
       },
     }),
-    async signIn({ user, account, profile, email, credentials }) {
-      // extra checks after sign in go here
-      return true;
-    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;

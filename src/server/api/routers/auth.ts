@@ -5,7 +5,8 @@ import { users } from "todo/server/db/schema";
 import { eq } from "drizzle-orm";
 
 import bcrypt from "bcryptjs";
-import { DatabaseError, UserNameTakeError } from "todo/server/auth/errors";
+import { trpcErrors } from "todo/server/auth/errors";
+import { TRPCError } from "@trpc/server";
 
 const SALT_ROUNDS = 10;
 
@@ -39,7 +40,7 @@ export const signUpRouter = createTRPCRouter({
           .limit(1);
 
         if (usernameExist) {
-          throw new UserNameTakeError();
+          throw trpcErrors.usernameTaken();
         }
 
         const hashedPassword = await bcrypt.hash(input.password, SALT_ROUNDS);
@@ -52,11 +53,10 @@ export const signUpRouter = createTRPCRouter({
           });
         return new_user;
       } catch (error) {
-        if (error instanceof UserNameTakeError) {
+        if (error instanceof TRPCError) {
           throw error;
         }
-
-        throw new DatabaseError();
+        throw trpcErrors.database();
       }
     }),
 });

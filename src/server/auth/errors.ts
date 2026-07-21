@@ -1,21 +1,14 @@
-import { CredentialsSignin } from "next-auth";
+import { TRPCError } from "@trpc/server";
 
-export class InvalidCredentialsError extends CredentialsSignin {
-  error = "invalid_credentials";
-}
-
-export class UserNotFoundError extends CredentialsSignin {
-  error = "user_not_found";
-}
-
-export class ValidationError extends CredentialsSignin {
-  error = "validation_error";
-}
-
-export class UserNameTakeError extends CredentialsSignin {
-  error = "user_name_taken";
-}
-
-export class DatabaseError extends CredentialsSignin {
-  error = "database_error";
-}
+export const trpcErrors = {
+  usernameTaken: () =>
+    new TRPCError({
+      code: "CONFLICT",
+      message: "Username is already taken",
+    }),
+  database: () =>
+    new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Database error",
+    }),
+};
