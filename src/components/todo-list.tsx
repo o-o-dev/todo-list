@@ -9,12 +9,12 @@ export function TodoList() {
 
   const toggleTodo = api.todo.toggle.useMutation({
     onSuccess: () => {
-      utils.todo.getAll.invalidate();
+      void utils.todo.getAll.invalidate();
     },
   });
   const deleteTodo = api.todo.delete.useMutation({
     onSuccess: () => {
-      utils.todo.getAll.invalidate();
+      void utils.todo.getAll.invalidate();
     },
   });
 

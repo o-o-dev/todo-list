@@ -12,6 +12,7 @@ import { signOut } from "todo/server/auth";
 
 import Link from "next/link";
 import { TodoList } from "todo/components/todo-list";
+import { TodoForm } from "todo/components/todo-form";
 
 export default async function Home() {
   const session = await auth();
@@ -93,7 +94,8 @@ export default async function Home() {
                   </div>
                 </CardHeader>
 
-                <CardContent>
+                <CardContent className="space-y-6">
+                  <TodoForm />
                   <TodoList />
                 </CardContent>
               </Card>
