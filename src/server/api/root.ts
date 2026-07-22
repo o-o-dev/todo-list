@@ -1,4 +1,5 @@
 import { todoRouter } from "todo/server/api/routers/todo";
+import { categoryRouter } from "todo/server/api/routers/categories";
 import { signUpRouter } from "todo/server/api/routers/auth";
 import { createCallerFactory, createTRPCRouter } from "todo/server/api/trpc";
 
@@ -10,6 +11,7 @@ import { createCallerFactory, createTRPCRouter } from "todo/server/api/trpc";
 export const appRouter = createTRPCRouter({
   todo: todoRouter,
   signup: signUpRouter,
+  category: categoryRouter,
 });
 
 // export type definition of API

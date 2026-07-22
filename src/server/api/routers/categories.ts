@@ -4,11 +4,17 @@ import { z } from "zod";
 import { trpcErrors } from "todo/server/auth/errors";
 import { and, eq } from "drizzle-orm";
 
-const categoryRouter = createTRPCRouter({
+export const categoryRouter = createTRPCRouter({
+  getAll: protectedProcedure.query(async ({ ctx }) => {
+    return await ctx.db
+      .select()
+      .from(categories)
+      .where(eq(categories.userId, ctx.session.user.id));
+  }),
   create: protectedProcedure
     .input(
       z.object({
-        name: z.string().trim().min(1, "Must add color name"),
+        name: z.string().trim().min(1, "Must add category"),
         color: z.string().trim().min(1, "Must add color"),
       }),
     )
@@ -25,6 +31,8 @@ const categoryRouter = createTRPCRouter({
       if (!result) {
         throw trpcErrors.internalError("Error Creating category");
       }
+
+      return result;
     }),
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
@@ -42,6 +50,8 @@ const categoryRouter = createTRPCRouter({
       if (!result) {
         throw trpcErrors.notFound("Category not found");
       }
+
+      return result;
     }),
   update: protectedProcedure
     .input(
@@ -54,7 +64,7 @@ const categoryRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const [result] = await ctx.db
         .update(categories)
-        .set({ id: input.id, name: input.name, color: input.color })
+        .set({ name: input.name, color: input.color })
         .where(
           and(
             eq(categories.id, input.id),
@@ -66,5 +76,6 @@ const categoryRouter = createTRPCRouter({
       if (!result) {
         throw trpcErrors.notFound("Category not found");
       }
+      return result;
     }),
 });
