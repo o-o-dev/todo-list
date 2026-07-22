@@ -1,12 +1,7 @@
 "use client";
 
+import { api } from "todo/trpc/react";
 import { cn } from "todo/lib/utils";
-
-interface Category {
-  id: string;
-  name: string;
-  color: string | null;
-}
 
 interface CategorySelectProps {
   value: string | null;
@@ -21,9 +16,7 @@ export function CategorySelect({
   disabled,
   className,
 }: CategorySelectProps) {
-  // TODO: Fetch categories using api.category.getAll.useQuery()
-  const categories: Category[] = [];
-  const isLoading = false;
+  const { data: categories, isLoading } = api.category.getAll.useQuery();
 
   const selectedCategory = categories?.find((c) => c.id === value);
 

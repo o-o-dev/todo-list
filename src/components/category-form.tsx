@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { api } from "todo/trpc/react";
 import { Input } from "todo/components/ui/input";
 import { Button } from "todo/components/ui/button";
 import { ColorPicker } from "todo/components/color-picker";
@@ -14,17 +15,23 @@ export function CategoryForm({ onSuccess }: CategoryFormProps) {
   const [name, setName] = useState("");
   const [color, setColor] = useState<CategoryColor>(DEFAULT_CATEGORY_COLOR);
 
-  // TODO: Get utils from api.useUtils()
-  // TODO: Create mutation using api.category.create.useMutation()
-  // - onSuccess: reset form, invalidate category.getAll, call onSuccess prop
-  const isPending = false;
+  const utils = api.useUtils();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const createCategory = api.category.create.useMutation({
+    onSuccess: () => {
+      setName("");
+      setColor(DEFAULT_CATEGORY_COLOR);
+      void utils.category.getAll.invalidate();
+      onSuccess?.();
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const trimmedName = name.trim();
     if (!trimmedName) return;
 
-    // TODO: Call mutation with { name: trimmedName, color }
+    createCategory.mutate({ name: trimmedName, color });
   };
 
   return (
@@ -43,7 +50,7 @@ export function CategoryForm({ onSuccess }: CategoryFormProps) {
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Work, Personal, Shopping"
           maxLength={50}
-          disabled={isPending}
+          disabled={createCategory.isPending}
           aria-describedby="category-name-hint"
         />
         <p id="category-name-hint" className="text-xs text-muted-foreground">
@@ -56,16 +63,16 @@ export function CategoryForm({ onSuccess }: CategoryFormProps) {
         <ColorPicker
           value={color}
           onChange={setColor}
-          disabled={isPending}
+          disabled={createCategory.isPending}
         />
       </div>
 
       <Button
         type="submit"
-        disabled={isPending || !name.trim()}
+        disabled={createCategory.isPending || !name.trim()}
         className="w-full"
       >
-        {isPending ? "Creating..." : "Create Category"}
+        {createCategory.isPending ? "Creating..." : "Create Category"}
       </Button>
     </form>
   );

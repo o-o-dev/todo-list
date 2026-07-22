@@ -6,6 +6,7 @@ import { Input } from "todo/components/ui/input";
 
 import { type BatchState, type LocalTodoState } from "./interfaces";
 import { Button } from "./ui/button";
+import { CategorySelect } from "./category-select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,6 +23,7 @@ export function TodoList() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [editCategoryId, setEditCategoryId] = useState<string | null>(null);
   const [isBatchMode, setBatchMode] = useState(false);
   const [showExitWarning, setShowExitWarning] = useState(false);
   const [batchState, setBatchState] = useState<BatchState>({
@@ -65,16 +67,24 @@ export function TodoList() {
     },
   });
 
-  const startEditing = (id: string, content: string) => {
+  const startEditing = (
+    id: string,
+    content: string,
+    categoryId: string | null
+  ) => {
     setEditingId(id);
-    // In batch mode, use pending content if it exists
-    const pendingContent = batchState.pendingUpdates[id]?.content;
-    setEditContent(pendingContent ?? content);
+    // In batch mode, use pending values if they exist
+    const pending = batchState.pendingUpdates[id];
+    setEditContent(pending?.content ?? content);
+    setEditCategoryId(
+      pending?.categoryId !== undefined ? pending.categoryId : categoryId
+    );
   };
 
   const cancelEditing = () => {
     setEditingId(null);
     setEditContent("");
+    setEditCategoryId(null);
   };
 
   const updateLocal = (id: string, changes: Partial<LocalTodoState>) => {
@@ -123,7 +133,7 @@ export function TodoList() {
   const saveEdit = (id: string) => {
     const trimmed = editContent.trim();
     if (!trimmed) return;
-    updateTodo.mutate({ id, content: trimmed });
+    updateTodo.mutate({ id, content: trimmed, categoryId: editCategoryId });
   };
 
   const submitBatch = () => {
@@ -131,14 +141,18 @@ export function TodoList() {
 
     batchTodo.mutate({
       updates: Object.entries(batchState.pendingUpdates)
-        .filter(([, state]) => state.content !== undefined)
+        .filter(
+          ([, state]) =>
+            state.content !== undefined || state.categoryId !== undefined
+        )
         .map(([id, state]) => ({
           id,
-          content: state.content!,
+          content: state.content,
+          categoryId: state.categoryId,
         })),
       deleteIds: Array.from(batchState.pendingDeletes),
       toggleIds: Object.entries(batchState.pendingUpdates)
-        .filter(([, state]) => state.isCompleted != undefined)
+        .filter(([, state]) => state.isCompleted !== undefined)
         .map(([id]) => id),
     });
   };
@@ -242,74 +256,79 @@ export function TodoList() {
 
                 {editingId === todo.id ? (
                   /* Edit mode */
-                  <div className="flex flex-1 items-center gap-2">
-                    <Input
-                      type="text"
-                      value={editContent}
-                      onChange={(e) => setEditContent(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
+                  <div className="flex flex-1 flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="text"
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            if (isBatchMode) {
+                              updateLocal(todo.id, {
+                                content: editContent,
+                                categoryId: editCategoryId,
+                              });
+                              cancelEditing();
+                            } else {
+                              saveEdit(todo.id);
+                            }
+                          }
+                          if (e.key === "Escape") cancelEditing();
+                        }}
+                        className="h-8 flex-1 text-sm"
+                        maxLength={256}
+                        autoFocus
+                        disabled={
+                          isBatchMode ? batchTodo.isPending : updateTodo.isPending
+                        }
+                        aria-label="Edit task content"
+                      />
+                      {/* Save button */}
+                      <button
+                        onClick={() => {
                           if (isBatchMode) {
                             updateLocal(todo.id, {
                               content: editContent,
+                              categoryId: editCategoryId,
                             });
                             cancelEditing();
                           } else {
                             saveEdit(todo.id);
                           }
+                        }}
+                        type="button"
+                        className="text-muted-foreground transition-colors hover:text-green-500"
+                        aria-label="Save edit"
+                        disabled={
+                          isBatchMode ? batchTodo.isPending : updateTodo.isPending
                         }
-                        if (e.key === "Escape") cancelEditing();
-                      }}
-                      className="h-8 flex-1 text-sm"
-                      maxLength={256}
-                      autoFocus
-                      disabled={
-                        isBatchMode ? batchTodo.isPending : updateTodo.isPending
-                      }
-                      aria-label="Edit task content"
-                    />
-                    {/* Save button */}
-                    <button
-                      onClick={() => {
-                        if (isBatchMode) {
-                          updateLocal(todo.id, { content: editContent });
-                          cancelEditing();
-                        } else {
-                          saveEdit(todo.id);
-                        }
-                      }}
-                      type="button"
-                      className="text-muted-foreground transition-colors hover:text-green-500"
-                      aria-label="Save edit"
-                      disabled={
-                        isBatchMode ? batchTodo.isPending : updateTodo.isPending
-                      }
-                    >
-                      <svg
-                        className="size-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                        aria-hidden="true"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    </button>
-                    {/* Cancel button */}
-                    <button
-                      onClick={cancelEditing}
-                      type="button"
-                      className="text-muted-foreground hover:text-destructive transition-colors"
-                      aria-label="Cancel edit"
-                      disabled={
-                        isBatchMode ? batchTodo.isPending : updateTodo.isPending
-                      }
-                    >
+                        <svg
+                          className="size-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      </button>
+                      {/* Cancel button */}
+                      <button
+                        onClick={cancelEditing}
+                        type="button"
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                        aria-label="Cancel edit"
+                        disabled={
+                          isBatchMode ? batchTodo.isPending : updateTodo.isPending
+                        }
+                      >
                       <svg
                         className="size-4"
                         fill="none"
@@ -325,6 +344,14 @@ export function TodoList() {
                         />
                       </svg>
                     </button>
+                    </div>
+                    {isBatchMode && (
+                      <CategorySelect
+                        value={editCategoryId}
+                        onChange={setEditCategoryId}
+                        disabled={batchTodo.isPending}
+                      />
+                    )}
                   </div>
                 ) : (
                   /* View mode */
@@ -343,6 +370,23 @@ export function TodoList() {
                         {batchState.pendingUpdates[todo.id]?.content ??
                           todo.content}
                       </span>
+
+                      {todo.category && (
+                        <span
+                          className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium"
+                          style={{
+                            backgroundColor: `${todo.category.color}20`,
+                            color: todo.category.color ?? undefined,
+                          }}
+                        >
+                          <span
+                            className="size-2 rounded-full"
+                            style={{ backgroundColor: todo.category.color ?? undefined }}
+                            aria-hidden="true"
+                          />
+                          {todo.category.name}
+                        </span>
+                      )}
 
                       <time
                         dateTime={todo.createdAt.toISOString()}
@@ -378,7 +422,7 @@ export function TodoList() {
                     {/* Edit button - hidden if pending delete */}
                     {!isPendingDelete && (
                       <button
-                        onClick={() => startEditing(todo.id, todo.content)}
+                        onClick={() => startEditing(todo.id, todo.content, todo.categoryId)}
                         type="button"
                         className="text-muted-foreground hover:text-foreground transition-colors"
                         aria-label="Edit task"

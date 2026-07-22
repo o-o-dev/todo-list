@@ -1,18 +1,11 @@
 "use client";
 
+import { api } from "todo/trpc/react";
 import { CategoryForm } from "todo/components/category-form";
 import { CategoryItem } from "todo/components/category-item";
 
-interface Category {
-  id: string;
-  name: string;
-  color: string | null;
-}
-
 export function CategoryManager() {
-  // TODO: Fetch categories using api.category.getAll.useQuery()
-  const categories: Category[] = [];
-  const isLoading = false;
+  const { data: categories, isLoading } = api.category.getAll.useQuery();
 
   return (
     <div className="space-y-8">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { api } from "todo/trpc/react";
 import { Input } from "todo/components/ui/input";
 import { Button } from "todo/components/ui/button";
 import { ColorPicker } from "todo/components/color-picker";
@@ -23,18 +24,30 @@ export function CategoryItem({ category }: CategoryItemProps) {
     (category.color as CategoryColor) ?? "#3b82f6"
   );
 
-  // TODO: Get utils from api.useUtils()
-  // TODO: Create update mutation using api.category.update.useMutation()
-  // - onSuccess: setIsEditing(false), invalidate category.getAll
-  // TODO: Create delete mutation using api.category.delete.useMutation()
-  // - onSuccess: invalidate category.getAll
-  const isPending = false;
+  const utils = api.useUtils();
+
+  const updateCategory = api.category.update.useMutation({
+    onSuccess: () => {
+      setIsEditing(false);
+      void utils.category.getAll.invalidate();
+    },
+  });
+
+  const deleteCategory = api.category.delete.useMutation({
+    onSuccess: () => {
+      void utils.category.getAll.invalidate();
+    },
+  });
 
   const handleSave = () => {
     const trimmedName = editName.trim();
     if (!trimmedName) return;
 
-    // TODO: Call update mutation with { id: category.id, name: trimmedName, color: editColor }
+    updateCategory.mutate({
+      id: category.id,
+      name: trimmedName,
+      color: editColor,
+    });
   };
 
   const handleCancel = () => {
@@ -44,8 +57,10 @@ export function CategoryItem({ category }: CategoryItemProps) {
   };
 
   const handleDelete = () => {
-    // TODO: Call delete mutation with { id: category.id }
+    deleteCategory.mutate({ id: category.id });
   };
+
+  const isPending = updateCategory.isPending || deleteCategory.isPending;
 
   if (isEditing) {
     return (
