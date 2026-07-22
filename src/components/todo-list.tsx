@@ -4,7 +4,7 @@ import { useState } from "react";
 import { api } from "todo/trpc/react";
 import { Input } from "todo/components/ui/input";
 
-import { type BatchState } from "./interfaces";
+import { type BatchState, type LocalTodoState } from "./interfaces";
 import { Button } from "./ui/button";
 import {
   AlertDialog,
@@ -77,12 +77,14 @@ export function TodoList() {
     setEditContent("");
   };
 
-  const updateLocal = (id: string, content: string) => {
+  const updateLocal = (id: string, changes: Partial<LocalTodoState>) => {
     setBatchState((prev) => ({
       ...prev,
-      pendingUpdates: { ...prev.pendingUpdates, [id]: { content } },
+      pendingUpdates: {
+        ...prev.pendingUpdates,
+        [id]: { ...prev.pendingUpdates[id], ...changes },
+      },
     }));
-    cancelEditing();
   };
 
   const markForDelete = (id: string) => {
@@ -135,6 +137,9 @@ export function TodoList() {
           content: state.content!,
         })),
       deleteIds: Array.from(batchState.pendingDeletes),
+      toggleIds: Object.entries(batchState.pendingUpdates)
+        .filter(([, state]) => state.isCompleted != undefined)
+        .map(([id]) => id),
     });
   };
 
@@ -191,10 +196,22 @@ export function TodoList() {
                 }`}
               >
                 <button
-                  onClick={() => toggleTodo.mutate({ id: todo.id })}
+                  onClick={() => {
+                    if (isBatchMode) {
+                      updateLocal(todo.id, {
+                        isCompleted: !(
+                          batchState.pendingUpdates[todo.id]?.isCompleted ??
+                          todo.isCompleted
+                        ),
+                      });
+                    } else {
+                      toggleTodo.mutate({ id: todo.id });
+                    }
+                  }}
                   type="button"
                   className={`size-5 rounded-full border-2 transition-colors ${
-                    todo.isCompleted
+                    (batchState.pendingUpdates[todo.id]?.isCompleted ??
+                    todo.isCompleted)
                       ? "border-primary bg-primary"
                       : "border-border hover:border-primary/50"
                   }`}
@@ -204,7 +221,8 @@ export function TodoList() {
                       : "Mark task as complete"
                   }
                 >
-                  {todo.isCompleted && (
+                  {(batchState.pendingUpdates[todo.id]?.isCompleted ??
+                    todo.isCompleted) && (
                     <svg
                       className="text-primary-foreground size-full p-0.5"
                       fill="none"
@@ -232,7 +250,10 @@ export function TodoList() {
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           if (isBatchMode) {
-                            updateLocal(todo.id, editContent);
+                            updateLocal(todo.id, {
+                              content: editContent,
+                            });
+                            cancelEditing();
                           } else {
                             saveEdit(todo.id);
                           }
@@ -249,11 +270,14 @@ export function TodoList() {
                     />
                     {/* Save button */}
                     <button
-                      onClick={() =>
-                        isBatchMode
-                          ? updateLocal(todo.id, editContent)
-                          : saveEdit(todo.id)
-                      }
+                      onClick={() => {
+                        if (isBatchMode) {
+                          updateLocal(todo.id, { content: editContent });
+                          cancelEditing();
+                        } else {
+                          saveEdit(todo.id);
+                        }
+                      }}
                       type="button"
                       className="text-muted-foreground transition-colors hover:text-green-500"
                       aria-label="Save edit"
@@ -310,7 +334,8 @@ export function TodoList() {
                         className={`flex-1 text-sm ${
                           isPendingDelete
                             ? "text-red-500 line-through dark:text-red-400"
-                            : todo.isCompleted
+                            : (batchState.pendingUpdates[todo.id]
+                                  ?.isCompleted ?? todo.isCompleted)
                               ? "text-muted-foreground line-through"
                               : "text-foreground"
                         }`}
