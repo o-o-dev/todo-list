@@ -32,4 +32,10 @@ export const trpcErrors = {
       message: "Not Authorized",
     });
   },
+  badRequest: (message: string) => {
+    return new TRPCError({
+      code: "BAD_REQUEST",
+      message: message,
+    });
+  },
 };

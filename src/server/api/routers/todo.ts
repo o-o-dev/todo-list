@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "todo/server/api/trpc";
 import { todos } from "todo/server/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 
 import { trpcErrors } from "todo/server/auth/errors";
 
@@ -113,13 +113,27 @@ export const todoRouter = createTRPCRouter({
           }),
         ),
         deleteIds: z.array(z.string()),
+        toggleIds: z.array(z.string()),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
-      if (input.updates.length === 0 && input.deleteIds.length === 0) {
+      if (
+        input.updates.length === 0 &&
+        input.deleteIds.length === 0 &&
+        input.toggleIds.length === 0
+      ) {
         return { success: true, updateCount: 0, deleteCount: 0 };
       }
+
+      const deleteSet = new Set(input.deleteIds);
+      const toggleDeleteDups = input.toggleIds.filter((id) =>
+        deleteSet.has(id),
+      );
+      if (toggleDeleteDups.length > 0) {
+        throw trpcErrors.badRequest("Cannot toggle and delete the same item");
+      }
+
       let updateCount = 0;
       let deleteCount = 0;
       try {
@@ -144,6 +158,17 @@ export const todoRouter = createTRPCRouter({
               )
               .returning({ id: todos.id });
             deleteCount = result.length;
+          }
+          if (input.toggleIds.length > 0) {
+            await tx
+              .update(todos)
+              .set({ isCompleted: sql`NOT ${todos.isCompleted}` })
+              .where(
+                and(
+                  inArray(todos.id, input.toggleIds),
+                  eq(todos.userId, userId),
+                ),
+              );
           }
         });
       } catch (error) {
