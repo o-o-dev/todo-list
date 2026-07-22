@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "todo/components/ui/button";
 import { Input } from "todo/components/ui/input";
@@ -33,8 +34,17 @@ export default function SignupPage() {
   }>({});
 
   const signup = api.signup.signup.useMutation({
-    onSuccess: () => {
-      router.push("/login");
+    onSuccess: async () => {
+      const result = await signIn("credentials", {
+        username,
+        password,
+        redirect: false,
+      });
+      if (result?.ok) {
+        router.push("/");
+      } else {
+        router.push("/login");
+      }
     },
     onError: (error) => {
       setErrors({ form: error.message });
