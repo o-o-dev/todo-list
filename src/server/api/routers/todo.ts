@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "todo/server/api/trpc";
-import { todos } from "todo/server/db/schema";
+import { todos, categories } from "todo/server/db/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
 
 import { trpcErrors } from "todo/server/auth/errors";
@@ -9,8 +9,21 @@ import { trpcErrors } from "todo/server/auth/errors";
 export const todoRouter = createTRPCRouter({
   getAll: protectedProcedure.query(async ({ ctx }) => {
     return await ctx.db
-      .select()
+      .select({
+        id: todos.id,
+        content: todos.content,
+        isCompleted: todos.isCompleted,
+        createdAt: todos.createdAt,
+        updatedAt: todos.updatedAt,
+        categoryId: todos.categoryId,
+        category: {
+          id: categories.id,
+          name: categories.name,
+          color: categories.color,
+        },
+      })
       .from(todos)
+      .leftJoin(categories, eq(todos.categoryId, categories.id))
       .where(eq(todos.userId, ctx.session.user.id))
       .orderBy(todos.createdAt);
   }),
@@ -62,12 +75,17 @@ export const todoRouter = createTRPCRouter({
           .trim()
           .min(1, "Content Required")
           .max(256, "Todo is too long"),
+        categoryId: z.string().nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const [todo] = await ctx.db
         .insert(todos)
-        .values({ content: input.content, userId: ctx.session.user.id })
+        .values({
+          content: input.content,
+          userId: ctx.session.user.id,
+          categoryId: input.categoryId ?? null,
+        })
         .returning();
 
       if (!todo) {
@@ -85,12 +103,16 @@ export const todoRouter = createTRPCRouter({
           .trim()
           .min(1, "Content Required")
           .max(256, "Todo is too long"),
+        categoryId: z.string().nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const result = await ctx.db
         .update(todos)
-        .set({ content: input.content })
+        .set({
+          content: input.content,
+          categoryId: input.categoryId ?? null,
+        })
         .where(
           and(eq(todos.id, input.id), eq(todos.userId, ctx.session.user.id)),
         )
@@ -110,7 +132,9 @@ export const todoRouter = createTRPCRouter({
               .string()
               .trim()
               .min(1, "Must add Content")
-              .max(256, "Todo too long"),
+              .max(256, "Todo too long")
+              .optional(),
+            categoryId: z.string().nullish(),
           }),
         ),
         deleteIds: z.array(z.string()),
@@ -140,12 +164,18 @@ export const todoRouter = createTRPCRouter({
       try {
         await ctx.db.transaction(async (tx) => {
           for (const update of input.updates) {
-            const result = await tx
-              .update(todos)
-              .set({ content: update.content })
-              .where(and(eq(todos.id, update.id), eq(todos.userId, userId)))
-              .returning({ id: todos.id });
-            updateCount += result.length;
+            const setData: { content?: string; categoryId?: string | null } = {};
+            if (update.content !== undefined) setData.content = update.content;
+            if (update.categoryId !== undefined) setData.categoryId = update.categoryId ?? null;
+
+            if (Object.keys(setData).length > 0) {
+              const result = await tx
+                .update(todos)
+                .set(setData)
+                .where(and(eq(todos.id, update.id), eq(todos.userId, userId)))
+                .returning({ id: todos.id });
+              updateCount += result.length;
+            }
           }
 
           if (input.deleteIds.length > 0) {
