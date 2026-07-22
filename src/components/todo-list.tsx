@@ -344,6 +344,17 @@ export function TodoList() {
                           todo.content}
                       </span>
 
+                      <time
+                        dateTime={todo.createdAt.toISOString()}
+                        title={todo.createdAt.toLocaleString()}
+                        className="text-muted-foreground shrink-0 text-xs"
+                        aria-label={`Created on ${todo.createdAt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`}
+                      >
+                        {todo.createdAt.toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </time>
                       {/* Pending update badge */}
                       {isPendingUpdate && !isPendingDelete && (
                         <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-800 dark:text-amber-200">
