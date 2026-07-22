@@ -44,6 +44,23 @@ export const todos = createTable(
       .varchar({ length: 255 })
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    categoryId: d
+      .varchar({ length: 255 })
+      .references(() => categories.id, { onDelete: "set null" }),
   }),
   (table) => [index("todos_user_id_idx").on(table.userId)],
 );
+
+export const categories = createTable("categories", (d) => ({
+  id: d
+    .varchar({ length: 255 })
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: d.varchar({ length: 255 }).notNull(),
+  color: d.varchar({ length: 7 }),
+  userId: d
+    .varchar({ length: 255 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+}));
