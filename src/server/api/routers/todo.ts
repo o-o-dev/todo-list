@@ -11,7 +11,8 @@ export const todoRouter = createTRPCRouter({
     return await ctx.db
       .select()
       .from(todos)
-      .where(eq(todos.userId, ctx.session.user.id));
+      .where(eq(todos.userId, ctx.session.user.id))
+      .orderBy(todos.createdAt);
   }),
   toggle: protectedProcedure
     .input(z.object({ id: z.string() }))
