@@ -8,6 +8,7 @@ import { Input } from "todo/components/ui/input";
 export function TodoForm() {
   const utils = api.useUtils();
   const [content, setContent] = useState("");
+
   const createTodo = api.todo.create.useMutation({
     onSuccess: () => {
       setContent("");

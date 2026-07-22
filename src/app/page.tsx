@@ -38,9 +38,17 @@ export default async function Home() {
 
             <div className="flex items-center gap-4">
               {session?.user && (
-                <span className="text-muted-foreground text-sm">
-                  {session.user.username}
-                </span>
+                <>
+                  <Link
+                    href="/categories"
+                    className="text-muted-foreground hover:text-foreground text-sm transition-colors"
+                  >
+                    Categories
+                  </Link>
+                  <span className="text-muted-foreground text-sm">
+                    {session.user.username}
+                  </span>
+                </>
               )}
               <form
                 action={async () => {
